@@ -105,7 +105,8 @@
 
 
 		<preference name="IOS_MIN_VERSION" default="9.0" />
-		<pods-config ios-min-version="$IOS_MIN_VERSION" use-frameworks="true"/>
+		<preference name="IOS_STRIP_DEBUG" default="false" />
+		<pods-config ios-min-version="$IOS_MIN_VERSION" use-frameworks="true" strip-debug="$IOS_STRIP_DEBUG"/>
 
 
 		<pod name="Firebase/Core" spec="5.20.2" />
