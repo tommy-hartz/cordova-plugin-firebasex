@@ -56,7 +56,7 @@
 		<source-file src="src/android/FirebasePluginMessageReceiverManager.java" target-dir="src/org/apache/cordova/firebase" />
 		<source-file src="src/android/JavaScriptException.java" target-dir="src/org/apache/cordova/firebase"/>
 
-		<source-file src="src/android/colors.xml" target-dir="res/values" />
+		<resource-file src="src/android/colors.xml" target="res/values" />
 		<preference name="ANDROID_ICON_ACCENT" default="#FF00FFFF" />
 		<config-file target="res/values/colors.xml" parent="/resources">
 			<color name="accent">$ANDROID_ICON_ACCENT</color>
