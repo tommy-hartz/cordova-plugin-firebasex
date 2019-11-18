@@ -116,7 +116,7 @@
 			<config>
 				<source url="https://cdn.cocoapods.org/"/>
 			</config>
-			<pods use-frameworks="true">
+			<pods>
 				<pod name='Firebase/Analytics' spec="6.13.0"/>
 				<pod name="Firebase/Auth" spec="6.13.0"/>
 				<pod name="Firebase/Messaging" spec="6.13.0"/>
