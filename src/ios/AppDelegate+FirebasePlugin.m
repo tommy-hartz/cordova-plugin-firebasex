@@ -63,12 +63,11 @@ static NSDictionary* mutableUserInfo;
             [FIRApp configure];
         }
 
-        // Set FCM messaging delegate
-        [FIRMessaging messaging].delegate = self;
-        [FIRMessaging messaging].shouldEstablishDirectChannel = true;
-        
-        // Set UNUserNotificationCenter delegate
-        self.delegate = [UNUserNotificationCenter currentNotificationCenter].delegate;
+    // [START set_messaging_delegate]
+    [FIRMessaging messaging].delegate = self;
+    // [END set_messaging_delegate]
+#if defined(__IPHONE_10_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_10_0
+    self.delegate = [UNUserNotificationCenter currentNotificationCenter].delegate;
         [UNUserNotificationCenter currentNotificationCenter].delegate = self;
 
         // Set NSNotificationCenter observer
@@ -85,13 +84,13 @@ static NSDictionary* mutableUserInfo;
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application {
-    [FIRMessaging messaging].shouldEstablishDirectChannel = true;
+    [self connectToFcm];
     self.applicationInBackground = @(NO);
     NSLog(@"FCM direct channel = true");
 }
 
 - (void)applicationDidEnterBackground:(UIApplication *)application {
-    [FIRMessaging messaging].shouldEstablishDirectChannel = false;
+    [[FIRMessaging messaging] disconnect];
     self.applicationInBackground = @(YES);
     NSLog(@"FCM direct channel = false");
 }
@@ -110,24 +109,24 @@ static NSDictionary* mutableUserInfo;
     // Note that this callback will be fired everytime a new token is generated, including the first
     // time. So if you need to retrieve the token as soon as it is available this is where that
     // should be done.
-    @try{
-        [[FIRInstanceID instanceID] instanceIDWithHandler:^(FIRInstanceIDResult * _Nullable result,
-                                                            NSError * _Nullable error) {
-            @try{
-                if (error == nil) {
-                    NSString *refreshedToken = result.token;
-                    NSLog(@"tokenRefreshNotification: %@", refreshedToken);
-                    [FirebasePlugin.firebasePlugin sendToken:refreshedToken];
-                }else{
-                    [FirebasePlugin.firebasePlugin _logError:[NSString stringWithFormat:@"tokenRefreshNotification: %@", error.description]];
-                }
-            }@catch (NSException *exception) {
-                [FirebasePlugin.firebasePlugin handlePluginExceptionWithoutContext:exception];
-            }
-        }];
-    }@catch (NSException *exception) {
-        [FirebasePlugin.firebasePlugin handlePluginExceptionWithoutContext:exception];
-    }
+    NSString *refreshedToken = [[FIRInstanceID instanceID] token];
+    NSLog(@"InstanceID token: %@", refreshedToken);
+
+    // Connect to FCM since connection may have failed when attempted before having a token.
+    [self connectToFcm];
+    [FirebasePlugin.firebasePlugin sendToken:refreshedToken];
+}
+
+- (void)connectToFcm {
+    [[FIRMessaging messaging] connectWithCompletion:^(NSError * _Nullable error) {
+        if (error != nil) {
+            NSLog(@"Unable to connect to FCM. %@", error);
+        } else {
+            NSLog(@"Connected to FCM.");
+            NSString *refreshedToken = [[FIRInstanceID instanceID] token];
+            NSLog(@"InstanceID token: %@", refreshedToken);
+        }
+    }];
 }
 
 - (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
