@@ -616,15 +616,14 @@ static BOOL registeredForRemoteNotifications = NO;
      [self.commandDelegate runInBackground:^{
          @try {
              FIRRemoteConfig* remoteConfig = [FIRRemoteConfig remoteConfig];
-             [remoteConfig activateWithCompletionHandler:^(NSError * _Nullable error) {
-                 CDVPluginResult *pluginResult;
-                 if (error != nil) {
-                     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error.description];
-                 } else {
-                     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-                 }
-                 [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-             }];
+             BOOL activated = [remoteConfig activateFetched];
+             CDVPluginResult *pluginResult;
+
+             if (activated) {
+                 pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+             } else {
+                 pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
+             }
          }@catch (NSException *exception) {
              [self handlePluginExceptionWithContext:exception :command];
          }
