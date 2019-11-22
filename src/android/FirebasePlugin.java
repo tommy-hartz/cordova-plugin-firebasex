@@ -73,13 +73,20 @@ public class FirebasePlugin extends CordovaPlugin {
         final Bundle extras = this.cordova.getActivity().getIntent().getExtras();
         this.cordova.getThreadPool().execute(new Runnable() {
             public void run() {
-                Log.d(TAG, "Starting Firebase plugin");
-                FirebaseApp.initializeApp(context);
-                mFirebaseAnalytics = FirebaseAnalytics.getInstance(context);
-                mFirebaseAnalytics.setAnalyticsCollectionEnabled(true);
-                if (extras != null && extras.size() > 1) {
-                    if (FirebasePlugin.notificationStack == null) {
-                        FirebasePlugin.notificationStack = new ArrayList<Bundle>();
+                try {
+                    Log.d(TAG, "Starting Firebase plugin");
+                    FirebaseApp.initializeApp(applicationContext);
+                    mFirebaseAnalytics = FirebaseAnalytics.getInstance(applicationContext);
+                    mFirebaseAnalytics.setAnalyticsCollectionEnabled(true);
+                    if (extras != null && extras.size() > 1) {
+                        if (FirebasePlugin.notificationStack == null) {
+                            FirebasePlugin.notificationStack = new ArrayList<Bundle>();
+                        }
+                        if (extras.containsKey("google.message_id")) {
+                            extras.putString("messageType", "notification");
+                            extras.putString("tap", "background");
+                            notificationStack.add(extras);
+                        }
                     }
                     if (extras.containsKey("google.message_id")) {
                         extras.putBoolean("tap", true);
@@ -309,8 +316,9 @@ public class FirebasePlugin extends CordovaPlugin {
         super.onNewIntent(intent);
         final Bundle data = intent.getExtras();
         if (data != null && data.containsKey("google.message_id")) {
-            data.putBoolean("tap", true);
-            FirebasePlugin.sendNotification(data, this.cordova.getActivity().getApplicationContext());
+            data.putString("messageType", "notification");
+            data.putString("tap", "background");
+            FirebasePlugin.sendMessage(data, applicationContext);
         }
     }
 

@@ -127,21 +127,18 @@
     NSLog(@"deviceToken1 = %@", deviceToken);
 }
 
-- (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo {
-    NSDictionary *mutableUserInfo = [userInfo mutableCopy];
-
-    [mutableUserInfo setValue:self.applicationInBackground forKey:@"tap"];
-
-    // Print full message.
-    NSLog(@"%@", mutableUserInfo);
-
-    [FirebasePlugin.firebasePlugin sendNotification:mutableUserInfo];
-}
-
+//Tells the app that a remote notification arrived that indicates there is data to be fetched.
+// Called when a message arrives in the foreground and remote notifications permission has been granted
 - (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo
     fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler {
 
     NSDictionary *mutableUserInfo = [userInfo mutableCopy];
+    NSDictionary* aps = [mutableUserInfo objectForKey:@"aps"];
+    if([aps objectForKey:@"alert"] != nil){
+        [mutableUserInfo setValue:@"notification" forKey:@"messageType"];
+    }else{
+        [mutableUserInfo setValue:@"data" forKey:@"messageType"];
+    }
 
     [mutableUserInfo setValue:self.applicationInBackground forKey:@"tap"];
     // Print full message.
@@ -161,6 +158,108 @@
     [FirebasePlugin.firebasePlugin sendNotification:remoteMessage.appData];
 }
 
+// Scans a message for keys which indicate a notification should be shown.
+// If found, extracts relevant keys and uses then to display a local notification
+-(void)processMessageForForegroundNotification:(NSDictionary*)messageData {
+    bool showForegroundNotification = [messageData objectForKey:@"notification_foreground"];
+    if(!showForegroundNotification){
+        return;
+    }
+    
+    NSString* title = nil;
+    NSString* body = nil;
+    NSString* sound = nil;
+    NSString* badge = nil;
+    
+    // Extract APNS notification keys
+    NSDictionary* aps = [messageData objectForKey:@"aps"];
+    if([aps objectForKey:@"alert"] != nil){
+        NSDictionary* alert = [aps objectForKey:@"alert"];
+        if([alert objectForKey:@"title"] != nil){
+            title = [alert objectForKey:@"title"];
+        }
+        if([alert objectForKey:@"body"] != nil){
+            body = [alert objectForKey:@"body"];
+        }
+        if([aps objectForKey:@"sound"] != nil){
+            sound = [aps objectForKey:@"sound"];
+        }
+        if([aps objectForKey:@"badge"] != nil){
+            sound = [aps objectForKey:@"badge"];
+        }
+    }
+    
+    // Extract data notification keys
+    if([messageData objectForKey:@"notification_title"] != nil){
+        title = [messageData objectForKey:@"notification_title"];
+    }
+    if([messageData objectForKey:@"notification_body"] != nil){
+        body = [messageData objectForKey:@"notification_body"];
+    }
+    if([messageData objectForKey:@"notification_ios_sound"] != nil){
+        sound = [messageData objectForKey:@"notification_ios_sound"];
+    }
+    if([messageData objectForKey:@"notification_ios_badge"] != nil){
+        badge = [messageData objectForKey:@"notification_ios_badge"];
+    }
+   
+    if(title == nil || body == nil){
+        return;
+    }
+    
+    [[UNUserNotificationCenter currentNotificationCenter] getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings * _Nonnull settings) {
+        if (settings.alertSetting == UNNotificationSettingEnabled) {
+            UNMutableNotificationContent *objNotificationContent = [[UNMutableNotificationContent alloc] init];
+            objNotificationContent.title = [NSString localizedUserNotificationStringForKey:title arguments:nil];
+            objNotificationContent.body = [NSString localizedUserNotificationStringForKey:body arguments:nil];
+            
+            NSDictionary* alert = [[NSDictionary alloc] initWithObjectsAndKeys:
+                                   title, @"title",
+                                   body, @"body"
+                                   , nil];
+            NSMutableDictionary* aps = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
+                                 alert, @"alert",
+                                 nil];
+            
+            if([sound isEqualToString:@"default"]){
+                objNotificationContent.sound = [UNNotificationSound defaultSound];
+                [aps setValue:sound forKey:@"sound"];
+            }else if(sound != nil){
+                objNotificationContent.sound = [UNNotificationSound soundNamed:sound];
+                [aps setValue:sound forKey:@"sound"];
+            }
+            
+            if(badge != nil){
+                NSNumberFormatter* f = [[NSNumberFormatter alloc] init];
+                f.numberStyle = NSNumberFormatterDecimalStyle;
+                objNotificationContent.badge = [f numberFromString:badge];
+                [aps setValue:badge forKey:@"badge"];
+            }
+            
+            
+            NSDictionary* userInfo = [[NSDictionary alloc] initWithObjectsAndKeys:
+                                      @"true", @"notification_foreground",
+                                      @"data", @"messageType",
+                                      aps, @"aps"
+                                      , nil];
+            
+            objNotificationContent.userInfo = userInfo;
+            
+            UNTimeIntervalNotificationTrigger *trigger =  [UNTimeIntervalNotificationTrigger triggerWithTimeInterval:0.1f repeats:NO];
+            UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:@"local_notification" content:objNotificationContent trigger:trigger];
+            [[UNUserNotificationCenter currentNotificationCenter] addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
+                if (!error) {
+                    NSLog(@"Local Notification succeeded");
+                } else {
+                    NSLog(@"Local Notification failed: %@", error);
+                }
+            }];
+        }else{
+            NSLog(@"processMessageForForegroundNotification: cannot show notification as permission denied");
+        }
+    }];
+}
+
 - (void)application:(UIApplication *)application didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
   NSLog(@"Unable to register for remote notifications: %@", error);
 }
@@ -178,7 +277,11 @@
     if (![notification.request.trigger isKindOfClass:UNPushNotificationTrigger.class])
         return;
 
-    NSDictionary *mutableUserInfo = [notification.request.content.userInfo mutableCopy];
+    NSDictionary* mutableUserInfo = [notification.request.content.userInfo mutableCopy];
+    NSString* messageType = [mutableUserInfo objectForKey:@"messageType"];
+    if(![messageType isEqualToString:@"data"]){
+        [mutableUserInfo setValue:@"notification" forKey:@"messageType"];
+    }
 
     [mutableUserInfo setValue:self.applicationInBackground forKey:@"tap"];
 
@@ -189,6 +292,8 @@
     [FirebasePlugin.firebasePlugin sendNotification:mutableUserInfo];
 }
 
+// Asks the delegate to process the user's response to a delivered notification.
+// Called when user taps on system notification
 - (void) userNotificationCenter:(UNUserNotificationCenter *)center
  didReceiveNotificationResponse:(UNNotificationResponse *)response
           withCompletionHandler:(void (^)(void))completionHandler
@@ -197,12 +302,25 @@
        didReceiveNotificationResponse:response
                 withCompletionHandler:completionHandler];
 
-    if (![response.notification.request.trigger isKindOfClass:UNPushNotificationTrigger.class])
+    if (![response.notification.request.trigger isKindOfClass:UNPushNotificationTrigger.class] && ![response.notification.request.trigger isKindOfClass:UNTimeIntervalNotificationTrigger.class]){
+        NSLog(@"didReceiveNotificationResponse: aborting as not a supported UNNotificationTrigger");
         return;
+    }
 
     NSDictionary *mutableUserInfo = [response.notification.request.content.userInfo mutableCopy];
-
-    [mutableUserInfo setValue:@YES forKey:@"tap"];
+    
+    NSString* tap;
+    if([self.applicationInBackground isEqual:[NSNumber numberWithBool:YES]]){
+        tap = @"background";
+    }else{
+        tap = @"foreground";
+        
+    }
+    [mutableUserInfo setValue:tap forKey:@"tap"];
+    if([mutableUserInfo objectForKey:@"messageType"] == nil){
+        [mutableUserInfo setValue:@"notification" forKey:@"messageType"];
+    }
+    
 
     // Print full message.
     NSLog(@"Response %@", mutableUserInfo);
