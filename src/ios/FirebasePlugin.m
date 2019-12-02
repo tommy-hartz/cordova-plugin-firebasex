@@ -60,22 +60,15 @@ static BOOL registeredForRemoteNotifications = NO;
     }
 }
 
+// DEPRECATED - alias of getToken
+- (void)getInstanceId:(CDVInvokedUrlCommand *)command {
+    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:[[FIRInstanceID instanceID] token]];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
 - (void)getToken:(CDVInvokedUrlCommand *)command {
-    @try {
-        [[FIRInstanceID instanceID] instanceIDWithHandler:^(FIRInstanceIDResult * _Nullable result,
-                                                            NSError * _Nullable error) {
-            CDVPluginResult* pluginResult;
-            if (error == nil) {
-                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:result.token];
-            }else{
-                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error.description];
-            }
-            
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-        }];
-    }@catch (NSException *exception) {
-        [self handlePluginExceptionWithContext:exception :command];
-    }
+    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:[[FIRInstanceID instanceID] token]];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 - (void)getAPNSToken:(CDVInvokedUrlCommand *)command {
@@ -441,36 +434,10 @@ static BOOL registeredForRemoteNotifications = NO;
 
 - (void)onTokenRefresh:(CDVInvokedUrlCommand *)command {
     self.tokenRefreshCallbackId = command.callbackId;
-    @try {
-        [[FIRInstanceID instanceID] instanceIDWithHandler:^(FIRInstanceIDResult * _Nullable result,
-                                                            NSError * _Nullable error) {
-            @try {
-                if (error == nil) {
-                    if (result.token != nil && error == nil) {
-                        [self sendToken:result.token];
-                    }
-                }else{
-                    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error.description];
-                    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-                }
-            }@catch (NSException *exception) {
-                [self handlePluginExceptionWithContext:exception :command];
-            }
-        }];
-    }@catch (NSException *exception) {
-        [self handlePluginExceptionWithContext:exception :command];
-    }
-}
+    NSString* currentToken = [[FIRInstanceID instanceID] token];
 
-- (void)onApnsTokenReceived:(CDVInvokedUrlCommand *)command {
-    self.apnsTokenRefreshCallbackId = command.callbackId;
-    @try {
-        NSString* apnsToken = [self getAPNSToken];
-        if(apnsToken != nil){
-            [self sendApnsToken:apnsToken];
-        }
-    }@catch (NSException *exception) {
-        [self handlePluginExceptionWithContext:exception :command];
+    if (currentToken != nil) {
+        [self sendToken:currentToken];
     }
 }
 
@@ -757,13 +724,8 @@ static BOOL registeredForRemoteNotifications = NO;
             CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
             FIRTrace *trace = (FIRTrace*)[self.traces objectForKey:traceName];
 
-            if (trace != nil) {
-                [trace incrementMetric:counterNamed byInt:1];
-                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-            } else {
-                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Trace not found"];
-            }
-
+        if (trace != nil) {
+            [trace incrementCounterNamed:counterNamed];
             [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
         }@catch (NSException *exception) {
             [self handlePluginExceptionWithContext:exception :command];
@@ -798,12 +760,9 @@ static BOOL registeredForRemoteNotifications = NO;
          @try {
             BOOL enabled = [[command argumentAtIndex:0] boolValue];
 
-            [FIRAnalytics setAnalyticsCollectionEnabled:enabled];
-            CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-         }@catch (NSException *exception) {
-             [self handlePluginExceptionWithContext:exception :command];
-         }
+        [[FIRAnalyticsConfiguration sharedInstance] setAnalyticsCollectionEnabled:enabled];
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
      }];
 }
 
