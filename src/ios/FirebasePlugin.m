@@ -229,86 +229,6 @@ static BOOL registeredForRemoteNotifications = NO;
     }
 }
 
-- (void)signInWithCredential:(CDVInvokedUrlCommand*)command {
-    NSString* verificationId = [command.arguments objectAtIndex:0];
-    NSString* code = [command.arguments objectAtIndex:1];
-
-    @try {
-        FIRAuthCredential* credential = [[FIRPhoneAuthProvider provider]
-        credentialWithVerificationID:verificationId
-                    verificationCode:code];
-        
-        [[FIRAuth auth] signInWithCredential:credential
-                                  completion:^(FIRAuthDataResult * _Nullable authResult,
-                                               NSError * _Nullable error) {
-            @try {
-                CDVPluginResult* pluginResult;
-              if (error) {
-                NSDictionary *message = @{
-                    @"code": [NSNumber numberWithInteger:error.code],
-                    @"description": error.description == nil ? [NSNull null] : error.description
-                };
-                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:message];
-              }else if (authResult == nil) {
-                  NSDictionary *message = @{
-                      @"code": [NSNumber numberWithInteger:999],
-                      @"description": @"User not signed in"
-                  };
-                  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:message];
-              }else{
-                  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-              }
-              [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-          }@catch (NSException *exception) {
-              [self handlePluginExceptionWithContext:exception :command];
-          }
-        }];
-        
-    }@catch (NSException *exception) {
-        [self handlePluginExceptionWithContext:exception :command];
-    }
-}
-
-- (void)linkUserWithCredential:(CDVInvokedUrlCommand*)command {
-    NSString* verificationId = [command.arguments objectAtIndex:0];
-    NSString* code = [command.arguments objectAtIndex:1];
-
-    @try {
-        FIRAuthCredential* credential = [[FIRPhoneAuthProvider provider]
-        credentialWithVerificationID:verificationId
-                    verificationCode:code];
-        
-        [[FIRAuth auth].currentUser linkWithCredential:credential
-                                  completion:^(FIRAuthDataResult * _Nullable authResult,
-                                               NSError * _Nullable error) {
-            @try {
-                CDVPluginResult* pluginResult;
-              if (error) {
-                NSDictionary *message = @{
-                    @"code": [NSNumber numberWithInteger:error.code],
-                    @"description": error.description == nil ? [NSNull null] : error.description
-                };
-                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:message];
-              }else if (authResult == nil) {
-                  NSDictionary *message = @{
-                      @"code": [NSNumber numberWithInteger:999],
-                      @"description": @"User not signed in"
-                  };
-                  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:message];
-              }else{
-                  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-              }
-              [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-          }@catch (NSException *exception) {
-              [self handlePluginExceptionWithContext:exception :command];
-          }
-        }];
-        
-    }@catch (NSException *exception) {
-        [self handlePluginExceptionWithContext:exception :command];
-    }
-}
-
 - (void)setBadgeNumber:(CDVInvokedUrlCommand *)command {
     @try {
         int number = [[command.arguments objectAtIndex:0] intValue];
@@ -661,15 +581,16 @@ static BOOL registeredForRemoteNotifications = NO;
      [self.commandDelegate runInBackground:^{
          @try {
              FIRRemoteConfig* remoteConfig = [FIRRemoteConfig remoteConfig];
-             [remoteConfig activateWithCompletionHandler:^(NSError * _Nullable error) {
-                 CDVPluginResult *pluginResult;
-                 if (error != nil) {
-                     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error.description];
-                 } else {
-                     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-                 }
-                 [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-             }];
+             BOOL activated = [remoteConfig activateFetched];
+             CDVPluginResult *pluginResult;
+
+             if (activated) {
+                 pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+             } else {
+                 pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
+             }
+
+             [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
          }@catch (NSException *exception) {
              [self handlePluginExceptionWithContext:exception :command];
          }
@@ -724,9 +645,10 @@ static BOOL registeredForRemoteNotifications = NO;
             CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
             FIRTrace *trace = (FIRTrace*)[self.traces objectForKey:traceName];
 
-        if (trace != nil) {
-            [trace incrementCounterNamed:counterNamed];
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            if (trace != nil) {
+                [trace incrementCounterNamed:counterNamed];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            }
         }@catch (NSException *exception) {
             [self handlePluginExceptionWithContext:exception :command];
         }
@@ -760,9 +682,12 @@ static BOOL registeredForRemoteNotifications = NO;
          @try {
             BOOL enabled = [[command argumentAtIndex:0] boolValue];
 
-        [[FIRAnalyticsConfiguration sharedInstance] setAnalyticsCollectionEnabled:enabled];
-        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            [[FIRAnalyticsConfiguration sharedInstance] setAnalyticsCollectionEnabled:enabled];
+            CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+         }@catch (NSException *exception) {
+             [self handlePluginExceptionWithContext:exception :command];
+         }
      }];
 }
 
