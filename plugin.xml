@@ -130,7 +130,7 @@
 			<config>
 				<source url="https://cdn.cocoapods.org/"/>
 			</config>
-			<pods use-frameworks="true">
+			<pods use-frameworks="false">
 				<pod name="Firebase/Core" spec="6.17.0"/>
 				<pod name="Firebase/Auth" spec="6.17.0"/>
 				<pod name="Firebase/Messaging" spec="6.17.0"/>
